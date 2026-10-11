@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Redactor — private image redact &amp; blur</title>
-<meta name="description" content="Redact, blur, or pixelate images entirely in your browser. Nothing is uploaded — the image never leaves your device.">
+<title>Redactor — private image &amp; video redact &amp; blur</title>
+<meta name="description" content="Redact, blur, or pixelate images and videos entirely in your browser. Nothing is uploaded — your file never leaves your device.">
 <meta name="theme-color" content="#161618">
-<meta property="og:title" content="Redactor — private image redact & blur">
-<meta property="og:description" content="Redact, blur, or pixelate images entirely in your browser. Nothing is uploaded.">
+<meta property="og:title" content="Redactor — private image & video redact & blur">
+<meta property="og:description" content="Redact, blur, or pixelate images and videos entirely in your browser. Nothing is uploaded.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23161618'/%3E%3Crect x='4' y='6' width='16' height='3' rx='1.5' fill='%23ECECEE'/%3E%3Crect x='4' y='11' width='9' height='3' rx='1.5' fill='%23ECECEE'/%3E%3Crect x='4' y='16' width='13' height='3' rx='1.5' fill='%23F5B301'/%3E%3C/svg%3E">
 <style>
   :root{
@@ -204,6 +204,23 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
   .toast .dot{width:7px;height:7px;border-radius:50%;background:var(--good);}
 
+  [hidden]{display:none !important;}
+  body{overflow:auto;}
+  .stage{min-height:120px;}
+  #canvas{touch-action:none;max-height:calc(100vh - 350px);}
+  .video-controls{padding:10px 18px;background:var(--surface);border-top:1px solid var(--border);flex:0 0 auto;}
+  .video-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .video-row + .video-row{margin-top:9px;}
+  #timeline{flex:1;min-width:100px;width:auto;}
+  #timeLabel{font:12px var(--mono);white-space:nowrap;color:var(--muted);}
+  .video-controls p{margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.5;}
+  .box-row label,#keyframeRow{font-size:12px;color:var(--muted);}
+  #boxSelect{background:var(--surface-2);color:var(--text);border:1px solid var(--border);padding:6px;border-radius:5px;max-width:160px;}
+  #keyframes{display:flex;gap:6px;flex-wrap:wrap;}
+  #keyframes button{font:11px var(--mono);}
+  #exportProgress{flex:1;min-width:100px;accent-color:var(--accent);}
+  #exportStatus{font-size:12px;}
+  .ghost.active{border-color:var(--accent);color:var(--accent);}
   @media (max-width:680px){
     header{flex-wrap:wrap;gap:10px;}
     .title small{display:none;}
@@ -234,7 +251,7 @@
     </button>
     <button class="btn primary" id="saveBtn" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Save PNG
+      <span id="saveLabel">Save PNG</span>
     </button>
   </div>
 </header>
@@ -243,15 +260,15 @@
   <div class="group">
     <span class="group-label">Tool</span>
     <div class="segmented" role="tablist">
-      <button class="seg active" data-tool="redact" role="tab">
+      <button class="seg active" data-tool="redact" role="tab" aria-selected="true">
         <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="9" width="18" height="6" rx="1"/></svg>
         Redact
       </button>
-      <button class="seg" data-tool="blur" role="tab">
+      <button class="seg" data-tool="blur" role="tab" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="2 3"/></svg>
         Blur
       </button>
-      <button class="seg" data-tool="pixelate" role="tab">
+      <button class="seg" data-tool="pixelate" role="tab" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="5" height="5"/><rect x="10" y="3" width="5" height="5" opacity=".5"/><rect x="3" y="10" width="5" height="5" opacity=".5"/><rect x="10" y="10" width="5" height="5"/><rect x="16" y="16" width="5" height="5" opacity=".5"/></svg>
         Pixelate
       </button>
@@ -269,7 +286,7 @@
 
   <div class="ctl" id="strengthCtl">
     <span class="group-label" id="strengthLabel">Strength</span>
-    <input type="range" id="strength" min="4" max="40" value="14">
+    <input type="range" id="strength" min="4" max="40" value="14" aria-label="Effect strength for new boxes">
     <span class="val" id="strengthVal">14px</span>
   </div>
 </div>
@@ -277,17 +294,40 @@
 <div class="stage" id="stage">
   <div class="empty-state" id="emptyState">
     <div class="empty-icon" aria-hidden="true"><span></span><span></span><span></span></div>
-    <h2>Drop an image to mark up</h2>
+    <h2>Drop an image or video</h2>
     <p>Drag a file here, paste a screenshot with <kbd>⌘V</kbd>, or click <b>Open</b>. Then drag across anything you want to hide.</p>
-    <p style="font-size:12.5px;color:var(--faint)">Nothing leaves your browser — the image is never uploaded.</p>
+    <p style="font-size:12.5px;color:var(--faint)">Nothing leaves your browser — your file is never uploaded.</p>
   </div>
   <div class="canvas-wrap empty" id="canvasWrap">
     <canvas id="canvas"></canvas>
   </div>
 </div>
 
+<section id="videoControls" class="video-controls" hidden aria-label="Video editor">
+  <div class="video-row">
+    <button class="ghost" id="playBtn">Play</button>
+    <input id="timeline" type="range" min="0" max="1" step="0.001" value="0" aria-label="Video position">
+    <output id="timeLabel" for="timeline">0:00.00 / 0:00.00</output>
+  </div>
+  <div class="video-row box-row">
+    <button class="ghost" id="addBoxBtn">Draw new box</button>
+    <label for="boxSelect">Selected box</label>
+    <select id="boxSelect" aria-label="Selected box"></select>
+    <button class="ghost" id="redrawBtn">Redraw box here</button>
+    <button class="ghost" id="removeBoxBtn">Remove box</button>
+  </div>
+  <p id="videoHint">Draw a box to cover the whole video. Pause and seek, then drag a box to change its position from that point.</p>
+  <div class="video-row" id="keyframeRow" hidden><span>Position changes:</span><div id="keyframes"></div></div>
+  <div class="video-row" id="exportRow" hidden>
+    <progress id="exportProgress" max="100" value="0" aria-label="Export progress"></progress>
+    <span id="exportStatus" role="status"></span>
+    <button class="ghost" id="cancelExportBtn">Cancel export</button>
+  </div>
+  <p id="exportHint">Export runs at playback speed with audio. Keep this tab visible until it finishes.</p>
+</section>
+
 <div class="status">
-  <div class="meta" id="meta"><span>No image</span></div>
+  <div class="meta" id="meta"><span>No file</span></div>
   <div class="spacer"></div>
   <div class="note" id="note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
@@ -303,292 +343,10 @@
   </button>
 </div>
 
-<input type="file" id="fileInput" accept="image/*" hidden>
+<input type="file" id="fileInput" accept="image/*,video/*,.mp4,.mov,.webm,.m4v" hidden>
 <div class="toast" id="toast"><span class="dot"></span><span id="toastText">Copied</span></div>
 
-<script>
-(function(){
-  "use strict";
-
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const wrap = document.getElementById('canvasWrap');
-  const emptyState = document.getElementById('emptyState');
-  const stage = document.getElementById('stage');
-  const fileInput = document.getElementById('fileInput');
-
-  let img = null;            // pristine source image
-  let regions = [];          // {x,y,w,h,type,color}
-  let tool = 'redact';
-  let fillColor = '#000000';
-  let strength = 14;
-  let fileName = 'image';
-
-  // drawing state (canvas-pixel coordinates)
-  let drawing = false, sx = 0, sy = 0, cx = 0, cy = 0;
-
-  /* ---------------- rendering ---------------- */
-  function render(){
-    if(!img) return;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(img,0,0);
-    for(const r of regions) applyRegion(r);
-    if(drawing) drawMarquee();
-  }
-
-  function applyRegion(r){
-    if(r.type==='redact'){
-      ctx.fillStyle = r.color;
-      ctx.fillRect(r.x,r.y,r.w,r.h);
-    } else if(r.type==='blur'){
-      applyBlur(r);
-    } else if(r.type==='pixelate'){
-      applyPixelate(r);
-    }
-  }
-
-  function applyBlur(r){
-    const s = r.strength;
-    const pad = Math.ceil(s*3);
-    const ax = Math.max(0, Math.floor(r.x - pad));
-    const ay = Math.max(0, Math.floor(r.y - pad));
-    const bx = Math.min(img.naturalWidth,  Math.ceil(r.x + r.w + pad));
-    const by = Math.min(img.naturalHeight, Math.ceil(r.y + r.h + pad));
-    const w = bx-ax, h = by-ay;
-    if(w<=0||h<=0) return;
-    const tmp = document.createElement('canvas');
-    tmp.width = w; tmp.height = h;
-    const tctx = tmp.getContext('2d');
-    tctx.filter = 'blur('+s+'px)';
-    tctx.drawImage(img, ax, ay, w, h, 0, 0, w, h);
-    // blit only the inner (padded edges absorbed the halo)
-    ctx.drawImage(tmp, r.x-ax, r.y-ay, r.w, r.h, r.x, r.y, r.w, r.h);
-  }
-
-  function applyPixelate(r){
-    const block = r.strength;
-    const cols = Math.max(1, Math.round(r.w/block));
-    const rows = Math.max(1, Math.round(r.h/block));
-    const tmp = document.createElement('canvas');
-    tmp.width = cols; tmp.height = rows;
-    const tctx = tmp.getContext('2d');
-    tctx.imageSmoothingEnabled = false;
-    tctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, cols, rows);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tmp, 0, 0, cols, rows, r.x, r.y, r.w, r.h);
-    ctx.imageSmoothingEnabled = true;
-  }
-
-  function drawMarquee(){
-    const x = Math.min(sx,cx), y = Math.min(sy,cy);
-    const w = Math.abs(cx-sx), h = Math.abs(cy-sy);
-    const scale = canvas.width / (canvas.getBoundingClientRect().width||canvas.width);
-    ctx.save();
-    ctx.fillStyle = 'rgba(245,179,1,0.14)';
-    ctx.fillRect(x,y,w,h);
-    ctx.strokeStyle = '#F5B301';
-    ctx.lineWidth = 1.5*scale;
-    ctx.setLineDash([6*scale,4*scale]);
-    ctx.strokeRect(x,y,w,h);
-    ctx.restore();
-  }
-
-  /* ---------------- coordinate mapping ---------------- */
-  function toCanvas(e){
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width/rect.width;
-    const scaleY = canvas.height/rect.height;
-    let x = (e.clientX-rect.left)*scaleX;
-    let y = (e.clientY-rect.top)*scaleY;
-    x = Math.max(0, Math.min(canvas.width,  x));
-    y = Math.max(0, Math.min(canvas.height, y));
-    return {x,y};
-  }
-
-  /* ---------------- pointer interaction ---------------- */
-  canvas.addEventListener('pointerdown', e=>{
-    if(!img) return;
-    canvas.setPointerCapture(e.pointerId);
-    drawing = true;
-    const p = toCanvas(e); sx=p.x; sy=p.y; cx=p.x; cy=p.y;
-  });
-  canvas.addEventListener('pointermove', e=>{
-    if(!drawing) return;
-    const p = toCanvas(e); cx=p.x; cy=p.y;
-    render();
-  });
-  function endDraw(){
-    if(!drawing) return;
-    drawing = false;
-    const x = Math.min(sx,cx), y = Math.min(sy,cy);
-    const w = Math.abs(cx-sx), h = Math.abs(cy-sy);
-    if(w>=3 && h>=3){
-      regions.push({x,y,w,h,type:tool,color:fillColor,strength:strength});
-    }
-    render();
-    updateUI();
-  }
-  canvas.addEventListener('pointerup', endDraw);
-  canvas.addEventListener('pointercancel', ()=>{drawing=false;render();});
-
-  /* ---------------- loading images ---------------- */
-  function loadFile(file){
-    if(!file || !file.type.startsWith('image/')) return;
-    fileName = (file.name||'image').replace(/\.[^.]+$/,'') || 'image';
-    const url = URL.createObjectURL(file);
-    const im = new Image();
-    im.onload = ()=>{
-      img = im;
-      canvas.width = im.naturalWidth;
-      canvas.height = im.naturalHeight;
-      regions = [];
-      wrap.classList.remove('empty');
-      emptyState.classList.add('hidden');
-      render();
-      updateUI();
-      URL.revokeObjectURL(url);
-    };
-    im.src = url;
-  }
-
-  fileInput.addEventListener('change', e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); fileInput.value=''; });
-  document.getElementById('openBtn').addEventListener('click', ()=>fileInput.click());
-
-  // paste (great for screenshots)
-  window.addEventListener('paste', e=>{
-    const items = e.clipboardData && e.clipboardData.items;
-    if(!items) return;
-    for(const it of items){
-      if(it.type.startsWith('image/')){ loadFile(it.getAsFile()); e.preventDefault(); return; }
-    }
-  });
-
-  // drag & drop
-  ['dragenter','dragover'].forEach(ev=>stage.addEventListener(ev, e=>{e.preventDefault();stage.classList.add('dragover');}));
-  ['dragleave','drop'].forEach(ev=>stage.addEventListener(ev, e=>{e.preventDefault();if(ev!=='dragleave'||e.target===stage)stage.classList.remove('dragover');}));
-  stage.addEventListener('drop', e=>{ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
-
-  /* ---------------- tool controls ---------------- */
-  document.querySelectorAll('.seg').forEach(b=>{
-    b.addEventListener('click', ()=>{
-      document.querySelectorAll('.seg').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      tool = b.dataset.tool;
-      syncControls();
-    });
-  });
-
-  function syncControls(){
-    const colorCtl = document.getElementById('colorCtl');
-    const strengthCtl = document.getElementById('strengthCtl');
-    const noteText = document.getElementById('noteText');
-    const note = document.getElementById('note');
-    const strengthLabel = document.getElementById('strengthLabel');
-    const slider = document.getElementById('strength');
-
-    if(tool==='redact'){
-      colorCtl.classList.add('show'); strengthCtl.classList.remove('show');
-      note.classList.remove('warn');
-      noteText.textContent = 'Solid cover — the safe choice. Drag across anything you want hidden.';
-    } else {
-      colorCtl.classList.remove('show'); strengthCtl.classList.add('show');
-      note.classList.add('warn');
-      if(tool==='blur'){
-        strengthLabel.textContent='Radius'; slider.min=4; slider.max=40;
-        if(strength<4)strength=14;
-      } else {
-        strengthLabel.textContent='Block'; slider.min=6; slider.max=60;
-        if(strength<6)strength=18;
-      }
-      slider.value = strength;
-      document.getElementById('strengthVal').textContent = strength+'px';
-      noteText.textContent = 'Heads up: blur and pixelation can sometimes be reversed. Use Redact for truly sensitive text.';
-    }
-  }
-
-  document.querySelectorAll('.swatch').forEach(s=>{
-    s.addEventListener('click', ()=>{
-      document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
-      s.classList.add('active');
-      fillColor = s.dataset.color;
-    });
-  });
-
-  document.getElementById('strength').addEventListener('input', e=>{
-    strength = parseInt(e.target.value,10);
-    document.getElementById('strengthVal').textContent = strength+'px';
-  });
-
-  /* ---------------- undo / clear ---------------- */
-  document.getElementById('undoBtn').addEventListener('click', ()=>{ regions.pop(); render(); updateUI(); });
-  document.getElementById('clearBtn').addEventListener('click', ()=>{ regions=[]; render(); updateUI(); });
-
-  window.addEventListener('keydown', e=>{
-    if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); regions.pop(); render(); updateUI(); }
-    if(e.key==='Escape' && drawing){ drawing=false; render(); }
-  });
-
-  /* ---------------- export ---------------- */
-  function exportBlob(cb){
-    if(!img) return;
-    // make sure no in-progress marquee is baked in
-    drawing=false; render();
-    canvas.toBlob(cb, 'image/png');
-  }
-
-  document.getElementById('saveBtn').addEventListener('click', ()=>{
-    exportBlob(blob=>{
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = fileName + '-redacted.png';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-      toast('Saved to Downloads');
-    });
-  });
-
-  document.getElementById('copyBtn').addEventListener('click', ()=>{
-    exportBlob(async blob=>{
-      try{
-        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
-        toast('Copied to clipboard');
-      }catch(err){
-        toast('Copy blocked here — use Save PNG', true);
-      }
-    });
-  });
-
-  /* ---------------- ui state ---------------- */
-  function updateUI(){
-    const has = !!img;
-    document.getElementById('saveBtn').disabled = !has;
-    document.getElementById('copyBtn').disabled = !has;
-    document.getElementById('undoBtn').disabled = regions.length===0;
-    document.getElementById('clearBtn').disabled = regions.length===0;
-    const meta = document.getElementById('meta');
-    if(has){
-      const n = regions.length;
-      meta.innerHTML = '<span><b>'+img.naturalWidth+'</b> × <b>'+img.naturalHeight+'</b> px</span>'+
-                       '<span><b>'+n+'</b> region'+(n===1?'':'s')+'</span>';
-    } else {
-      meta.innerHTML = '<span>No image</span>';
-    }
-  }
-
-  /* ---------------- toast ---------------- */
-  let toastTimer;
-  function toast(msg, warn){
-    const t = document.getElementById('toast');
-    document.getElementById('toastText').textContent = msg;
-    t.querySelector('.dot').style.background = warn ? 'var(--warn)' : 'var(--good)';
-    t.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
-  }
-
-  syncControls();
-  updateUI();
-})();
-</script>
+<script src="video-model.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
